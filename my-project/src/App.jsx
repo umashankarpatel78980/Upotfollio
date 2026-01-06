@@ -115,16 +115,19 @@ export default function ContactManagementApp() {
       return;
     }
     try {
-      const res = await API.post(`/reply/${selectedContact._id}`, {
-        message: replyMessage
-      });
-      if (res.data.success) {
+      // show a simple loading indicator
+      const res = await API.post(`/reply/${selectedContact._id}`, { message: replyMessage });
+      if (res.data && res.data.success) {
         alert('Reply sent successfully to ' + selectedContact.email);
         setReplyMessage('');
+      } else {
+        const errMsg = res.data?.message || 'Failed to send reply';
+        alert(errMsg);
       }
     } catch (err) {
       console.error(err);
-      alert('Failed to send reply email!');
+      const serverMsg = err?.response?.data?.message || err?.response?.data?.error || err.message || 'Failed to send reply email!';
+      alert(serverMsg);
     }
   };
 

@@ -1,4 +1,5 @@
 import Contact from '../models/Contact.js';
+import nodemailer from 'nodemailer';
 
 // Create new contact (for xtd form)
 export const createContact = async (req, res) => {
@@ -78,9 +79,51 @@ export const deleteContact = async (req, res) => {
 // Reply to contact (placeholder for now, can be implemented with nodemailer)
 export const replyToContact = async (req, res) => {
     try {
-        // Implementation for sending email reply goes here
-        // For now just return success
-        res.status(200).json({ success: true, message: "Reply sent successfully" });
+        const { message } = req.body;
+        console.log(message);
+
+        if (!message || !message.trim()) {
+            return res.status(400).json({ success: false, message: "Reply message is required" });
+        }
+
+        const contact = await Contact.findById(req.params.id);
+        if (!contact) return res.status(404).json({ success: false, message: "Contact not found" });
+
+        // Transporter uses environment variables for credentials
+        const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST,
+            port: process.env.SMTP_PORT,
+            secure: true,
+            auth: {
+                user: process.env.ADMIN_EMAIL,
+                pass: process.env.ADMIN_PASS
+            }
+        });
+
+        // Verify transporter connection (helps surface auth/connectivity errors)
+        try {
+            await transporter.verify();
+        } catch (verifyErr) {
+            console.error('Nodemailer verify failed:', verifyErr);
+            return res.status(500).json({ success: false, message: 'Email transporter verification failed', error: verifyErr.message });
+        }
+
+        const mailOptions = {
+            from: process.env.ADMIN_EMAIL,
+            to: contact.email,
+            subject: `Reply from Admin`,
+            text: message,
+            html: `<div style="font-family: Arial,Helvetica,sans-serif; font-size:14px; color:#222">${message.replace(/\n/g, '<br/>')}</div>`
+        };
+
+        try {
+            const info = await transporter.sendMail(mailOptions);
+            console.log('Email sent:', info);
+            res.status(200).json({ success: true, message: 'Reply sent successfully', info });
+        } catch (sendErr) {
+            console.error('Error sending email:', sendErr);
+            return res.status(500).json({ success: false, message: 'Failed to send email', error: sendErr.message });
+        }
     } catch (error) {
         console.error("Error replying to contact:", error);
         res.status(500).json({ success: false, message: "Server Error" });
